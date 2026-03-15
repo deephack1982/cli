@@ -168,16 +168,24 @@ jobs:
           repository: lag-app/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
+      - name: Download release tarballs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-assets
+          BASE="https://github.com/lag-app/cli/releases/download/v${{ inputs.version }}"
+          for file in lag-${{ inputs.version }}-darwin-aarch64.tar.gz \
+                      lag-${{ inputs.version }}-darwin-x86_64.tar.gz \
+                      lag-${{ inputs.version }}-linux-amd64.tar.gz \
+                      lag-${{ inputs.version }}-linux-arm64.tar.gz; do
+            curl -fsSL -o "release-assets/${file}" "${BASE}/${file}"
+          done
       - name: Update formula
         run: |
-          SHA_DARWIN_AARCH64=$(sha256sum artifacts/lag-${{ inputs.version }}-darwin-aarch64.tar.gz | cut -d' ' -f1)
-          SHA_DARWIN_X86_64=$(sha256sum artifacts/lag-${{ inputs.version }}-darwin-x86_64.tar.gz | cut -d' ' -f1)
-          SHA_LINUX_AMD64=$(sha256sum artifacts/lag-${{ inputs.version }}-linux-amd64.tar.gz | cut -d' ' -f1)
-          SHA_LINUX_ARM64=$(sha256sum artifacts/lag-${{ inputs.version }}-linux-arm64.tar.gz | cut -d' ' -f1)
+          SHA_DARWIN_AARCH64=$(sha256sum release-assets/lag-${{ inputs.version }}-darwin-aarch64.tar.gz | cut -d' ' -f1)
+          SHA_DARWIN_X86_64=$(sha256sum release-assets/lag-${{ inputs.version }}-darwin-x86_64.tar.gz | cut -d' ' -f1)
+          SHA_LINUX_AMD64=$(sha256sum release-assets/lag-${{ inputs.version }}-linux-amd64.tar.gz | cut -d' ' -f1)
+          SHA_LINUX_ARM64=$(sha256sum release-assets/lag-${{ inputs.version }}-linux-arm64.tar.gz | cut -d' ' -f1)
 
           mkdir -p homebrew-tap/Formula
           cat > homebrew-tap/Formula/lag.rb <<FORMULA
