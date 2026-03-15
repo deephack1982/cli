@@ -106,20 +106,57 @@ jobs:
           cd artifacts
           sha256sum lag-*.tar.gz *.deb > checksums-sha256.txt
           cat checksums-sha256.txt
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd artifacts
-          CHECKSUMS=$(cat checksums-sha256.txt)
+          CHECKSUMS=$(cat artifacts/checksums-sha256.txt)
+          cat > /tmp/release-notes.md <<'NOTES_EOF'
+          ## Install
+
+          **Quick install (macOS & Linux):**
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/lag-app/cli/main/install.sh | sh
+          ```
+
+          **Homebrew:**
+          ```bash
+          brew tap lag-app/tap && brew install lag
+          ```
+
+          **Debian/Ubuntu:**
+          ```bash
+          curl -LO https://github.com/lag-app/cli/releases/download/v${{ inputs.version }}/lag_${{ inputs.version }}-1_amd64.deb
+          sudo dpkg -i lag_*.deb
+          ```
+
+          ## What's Changed
+          NOTES_EOF
+
           gh release create "v${{ inputs.version }}" \
             --repo "${{ github.repository }}" \
             --title "v${{ inputs.version }}" \
-            --notes "## Checksums (SHA256)
+            --generate-notes \
+            --notes-start-tag "$(git describe --tags --abbrev=0 2>/dev/null || echo '')" \
+            artifacts/lag-*.tar.gz artifacts/*.deb artifacts/checksums-sha256.txt
+
+          # Prepend install instructions and checksums to the auto-generated notes
+          EXISTING=$(gh release view "v${{ inputs.version }}" --repo "${{ github.repository }}" --json body -q .body)
+          BODY="$(cat /tmp/release-notes.md)
+
+          ${EXISTING}
+
+          ## Checksums (SHA256)
           \`\`\`
           ${CHECKSUMS}
-          \`\`\`" \
-            lag-*.tar.gz *.deb checksums-sha256.txt
+          \`\`\`"
+
+          gh release edit "v${{ inputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --notes "$BODY"
 
   update-homebrew:
     needs: create-release
